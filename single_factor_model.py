@@ -26,10 +26,54 @@ Yield_quandl=Yield_quandl.iloc[8:,:]
 # on quandl return in the sample R2=0.03
 # on FRB return, in the sample R2=0.046
 
+########################
+# try yearly data
+# 1964-2003 R2=0.323
+# 1962-2018 R2=0.216
+
 data=Yield_quandl
-returns=return_quandl
+for i in data.index:
+    data['Date'][i]=datetime.strptime(data['Date'][i],'%Y-%m-%d')
+data=data.set_index('Date')
+data=data.iloc[:,0:5]
+data=data.loc[data.index[data.index.month.values==12]]
+log_data=np.log(data/100+1)
+
+#calculate bond prices from yields
+num=np.ones(np.shape(data.values)[0])
+maturity=pd.DataFrame(np.vstack([num*1,num*2,num*3,num*4,num*5]).T,data.index,data.columns)
+log_price=-(log_data*maturity)
+
+#calculate yearly return from yields
+log_returns=log_price.shift(1,axis=1).shift(-1,axis=0)-log_price
+log_returns.iloc[:,0]=log_data.iloc[:,0]
+
+#calculate forward rates from prices
+forward=log_price.shift(1,axis=1)-log_price
+forward.iloc[:,0]=log_returns.iloc[:,0]
+
+#deleting the last row which is nan
+log_returns=log_returns.iloc[:len(log_returns)-1,:]
+forward=forward.iloc[:len(forward)-1,:]
+
+# get excess return
+excess_returns=pd.DataFrame()
+for i in range(1,5):
+    excess_returns[log_data.columns[i]]=log_returns.iloc[:,i]-log_returns.iloc[:,0]
+    
+forward=forward[forward.index.year>=1964]
+forward=forward[forward.index.year<=2003]
+excess_returns=excess_returns.loc[forward.index]
+#forward['excess_return']=excess_returns.mean(axis=1)
+#print(forward.corr())
+model=sm.OLS(excess_returns.mean(axis=1),sm.add_constant(forward))
+results=model.fit()
+print(results.summary())
+
+
 #returns=return_FRB
 
+'''
 #change index to datetime
 for i in data.index:
     data['Date'][i]=datetime.strptime(data['Date'][i],'%Y-%m-%d')
@@ -72,7 +116,7 @@ model=sm.OLS(excess_returns.mean(axis=1),sm.add_constant(forward))
 results=model.fit()
 print(results.summary())
 in_the_sample_predict=results.predict(sm.add_constant(forward))
-
+'''
 '''
 # for FRB data
 data=Yield_FRB
