@@ -1,7 +1,7 @@
-%Data
+% Data
 SwissYields = xlsread("Swiss Yields.xls");
 GermanYields = xlsread("German Yield.xls");
-USYields = xlsread("Yield_quandl.xls");
+[USYields, Date] = xlsread("Yield_quandl.xls");
 FrenchYields = xlsread("France Yields.xls");
 SKYields = xlsread("south korea yields.xls");
 JapanYields = xlsread("Japan Yields.xls");
@@ -11,6 +11,9 @@ SpanishYields = xlsread("Spain Yields.xls");
 AustralianYields = xlsread("Australian Yields.xls");
 CanadaYields = xlsread("Canada yields.xls");
 UKYields = xlsread("UK Yields.xls");
+
+Date = Date(:,1);
+dates4Fig = datetime(Date, 'InputFormat', 'dd.MM.yyyy');
 
 %TTM
 Swissmaturities = [1,2,3,4,5,6,7,8,9,10,15,20,30,0.083333,0.25,0.5,1];
@@ -40,14 +43,16 @@ Australian_Returns = getbondreturns(AustralianYields, Australianmaturities, 1);
 Canada_Returns = getbondreturns(CanadaYields, Canadamaturities, 1);
 UK_Returns = getbondreturns(UKYields, UKmaturities, 1);
 
-%Choose Country%
-Country_Returns = Swiss_Returns;
-
-Country_Returns(isnan(Country_Returns)) = 0;
-figure
-plot(cumprod(1+Country_Returns))
-plot(dates4Fig, strategyNAV(:, 1), 'k-', dates4Fig, strategyNAV(:, 2), 'b-', dates4Fig, strategyNAV(:, 3), 'r-')
-hold on
-plot(dates4Fig, strategyNAV(:, 4), 'k--', dates4Fig, strategyNAV(:, 5), 'b--', dates4Fig, strategyNAV(:, 6), 'r--'),
-    xlabel('Year'), ylabel('Portfolio Value'), 
-    legend('Equally Weighted', 'Momentum Long Only', 'Momentum Long/Short', 'Equally Weighted, TC', 'Mom. Long Only, TC', 'Mom. Long/Short, TC', 'Location', 'NorthWest')
+Swiss_Returns = [Swissmaturities ; zeros(1,size(Swiss_Returns,2)) ; Swiss_Returns];
+Swiss_Returns = [dates4Fig(end-length(Swiss_Retu
+% xlswrite("Swiss_Returns.xls", Swiss_Returns)
+% 
+% %Choose Country%
+% Country_Returns = Swiss_Returns;
+% 
+% Country_Returns(isnan(Country_Returns)) = 0;
+% figure
+% plot(cumprod(1+Country_Returns)), xlabel('Time')
+% plot(dates4Fig, strategyNAV(:, 4), 'k--', dates4Fig, strategyNAV(:, 5), 'b--', dates4Fig, strategyNAV(:, 6), 'r--'),
+%     xlabel('Year'), ylabel('Portfolio Value'), 
+%     legend('Equally Weighted', 'Momentum Long Only', 'Momentum Long/Short', 'Equally Weighted, TC', 'Mom. Long Only, TC', 'Mom. Long/Short, TC', 'Location', 'NorthWest')

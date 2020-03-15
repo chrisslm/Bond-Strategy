@@ -12,6 +12,9 @@ AustralianYields = xlsread("Australian Yields.xls");
 CanadaYields = xlsread("Canada yields.xls");
 UKYields = xlsread("UK Yields.xls");
 
+Date = Date(:,1);
+dates4Fig = datetime(Date, 'InputFormat', 'dd.MM.yyyy');
+
 %TTM
 Swissmaturities = [1,2,3,4,5,6,7,8,9,10,15,20,30,0.083333,0.25,0.5,1];
 Germanmaturities = [1,2,3,4,5,6,7,8,9,10,15,20,30];
@@ -40,7 +43,9 @@ Australian_Returns = getbondreturns(AustralianYields, Australianmaturities, 1);
 Canada_Returns = getbondreturns(CanadaYields, Canadamaturities, 1);
 UK_Returns = getbondreturns(UKYields, UKmaturities, 1);
 
-xlswrite("Swiss_Returns.xls", Swiss_Returns)
+% Swiss_Returns = [Swissmaturities ; zeros(1,size(Swiss_Returns,2)) ; Swiss_Returns];
+% Swiss_Returns = [Date(end-length(Swiss_Returns)+1:end) Swiss_Returns];
+xlswrite("UK_Returns.xls", UK_Returns);
 % 
 % %Choose Country%
 % Country_Returns = Swiss_Returns;
