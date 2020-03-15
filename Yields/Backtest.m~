@@ -1,0 +1,153 @@
+clear
+clc
+%% Control Relevant Variables
+
+% For long-short factor construction, either integer or fraction. That
+% means if one wants to long three securities and short three, set both to
+% 3. However, if one wants to long the upper tercile and short the lower
+% tercile, set both to 1 / 3. If one gives an integer, set flag to 1, other
+% wise to 0.
+flag    = 1;
+nLongs  = 3;
+nShorts = 3;
+
+% Set other backtest relevant variables. The variable lag lags the series
+% that is used for any factor construction. Its unit is always equivalent
+% to one time step in each dates vector, that means if the data is monthly
+% data, then a lag of 1 means that the data is lagged by one month.
+lag = 1;
+
+% The time variable is used to distinguish between different types of data.
+% If the data is daily, set time to 0, if monthly to 1 and if yearly to 2.
+time = 1;
+
+% Option to plot the return series to check whether there are issues with
+% the data. If one wants to plot the data, set plot_var to 1, otherwise to
+% 0.
+plot_var = 0;
+
+% define the maturities for the different countries
+%TTM
+swiss_maturities         = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 0.083333, 0.25, 0.5, 1];
+german_maturities        = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30];
+us_maturities            = (1 : 1 : 30);
+french_maturities        = [0.083333, 0.25, 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 25, 30];
+sk_maturities            = [0.25, 0.5, 1, 2, 3, 5, 10, 20, 30];
+japan_maturities         = [0.083333, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 40];
+china_maturities         = [0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30];
+italian_maturities       = [0.25, 0.5, 1, 2, 3, 4, 5, 7, 8, 10, 15, 20, 30];
+spanish_maturities       = [0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 30];
+australian_maturities    = [0.083333, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 30, 0.08333, 0.25, 0.5];
+canada_maturities        = [0.083333, 0.25, 0.5, 1, 2, 3, 4, 5, 7, 10, 20, 30];
+uk_maturities            = [0.083333, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 30, 40];
+
+%% Load Bond Return Data
+
+% Load returns of all bonds (we colud include it in a script so that the
+% code will not be that full and we need to check whether we have the risk
+% free rate of every country (for now it's ok to do it without as only
+% factor construction)
+
+% do necessary transformations and extract the dates and column names of
+% each return series
+swiss_returns   = readtable('Swiss_Return_Final.xls');
+swiss_dates     = table2array(swiss_returns(:, 1));
+swiss_tickers   = swiss_returns.Properties.VariableNames(2 : end);
+swiss_returns   = table2array(swiss_returns(:, 2 : end));
+
+% also read the get the yields for every country
+swiss_yields    = xlsread('Swiss Yields desired format.xls');
+swiss_yields    = swiss_yields(:, 2 : end);
+
+% Set important variables per series
+% counts number of different maturities per country
+swiss_nMat      = length(swiss_returns(1, :));
+
+% counts the number of dates / observations per country
+swiss_obs       = length(swiss_dates);
+
+%% Check Return Availability
+
+% check when the individual series start
+swiss_avail = (swiss_returns > -1);
+swiss_count_avail = sum(swiss_avail, 2);
+
+%% Compute Dollar Evolution
+
+% This section computes for all return series the evolution of an
+% investment of 1 unit of currency in each of the return series.
+swiss_returns(isnan(swiss_returns)) = 0;
+swiss_nav = cumprod(1 + swiss_returns .* swiss_avail);
+swiss_nav = [ones(1, swiss_nMat); swiss_nav];
+
+%% Optional Plots
+
+% If plot_var is set to 1, one can see plots of the returns series.
+
+if plot_var == 1
+    figure(1)
+    semilogy(swiss_dates, swiss_nav);
+end
+
+%% Factor Setup
+
+if time == 0
+    year_frac = 252;
+elseif time == 1 
+    year_frac = 12;
+else
+    year_frac = 1;
+end
+
+% adapt the longs and shorts for each country depending on how the nLongs
+% and nShorts are defined above
+
+if nLongs < 1
+    nLongs_swiss    = floor(nLongs * swiss_nMat);
+    nShorts_swiss   = floor(nShorts * swiss_nMat);
+else
+    nLongs_swiss    = nLongs;
+    nShorts_swiss   = nShorts;
+end
+
+%% Momentum Factor Construction (within country)
+
+% calculate yearly returns with country NAVs
+swiss_mom_dates = swiss_dates(year_frac : end);
+swiss_yearly    = swiss_nav(year_frac : end, :) ./ swiss_nav(1 : end - year_frac + 1, :) - 1;
+
+% Calculate the nth largest and smallest return
+swiss_min_ret       = mink(swiss_yearly', nShorts_swiss)';
+swiss_min_ret       = swiss_min_ret(:, end);
+
+swiss_max_ret       = maxk(swiss_yearly', nLongs_swiss)';
+swiss_max_ret       = swiss_max_ret(:, end);
+
+% Generate the indicator matrices per country
+swiss_long_mom  = (swiss_yearly >= swiss_max_ret) / nLongs_swiss;
+swiss_short_mom = -1 * (swiss_yearly <= swiss_min_ret) / nShorts_swiss;
+swiss_ls_mom    = swiss_long_mom + swiss_short_mom;
+
+%% Low Volatility Factor Construction (within country)
+
+% Calculate the duration for each country
+swiss_duration = getbondduration(swiss_yields, swiss_maturities);
+
+% Calculate the low volatility factor
+swiss_lvol_factor = swiss_duration .* swiss_yields;
+
+% Calculate the nth largest and smallest factor
+swiss_min_vol       = mink(swiss_lvol_factor', nShorts_swiss)';
+swiss_min_vol       = swiss_min_vol(:, end);
+
+swiss_max_vol       = maxk(swiss_lvol_factor', nLongs_swiss)';
+swiss_max_vol       = swiss_max_vol(:, end);
+
+% Generate the indicator matrices per country
+swiss_long_vol  = (swiss_lvol_factor <= swiss_min_vol) / nLongs_swiss;
+swiss_short_vol = -1 * (swiss_lvol_factor >= swiss_max_vol) / nShorts_swiss;
+swiss_ls_vol    = swiss_long_vol + swiss_short_vol;
+
+%% Value Factor Construction (within country)
+
+%
