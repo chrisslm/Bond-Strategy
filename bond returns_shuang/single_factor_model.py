@@ -61,8 +61,8 @@ excess_returns=pd.DataFrame()
 for i in range(1,5):
     excess_returns[log_data.columns[i]]=log_returns.iloc[:,i]-log_returns.iloc[:,0]
     
-forward=forward[forward.index.year>=1964]
-forward=forward[forward.index.year<=2003]
+#forward=forward[forward.index.year>=1964]
+#forward=forward[forward.index.year<=2003]
 excess_returns=excess_returns.loc[forward.index]
 #forward['excess_return']=excess_returns.mean(axis=1)
 #print(forward.corr())
@@ -70,7 +70,39 @@ model=sm.OLS(excess_returns.mean(axis=1),sm.add_constant(forward))
 results=model.fit()
 print(results.summary())
 
+in_the_sample_predict=results.predict(sm.add_constant(forward))
+'''
+plt.figure()
+plt.plot(excess_returns.index,excess_returns.mean(axis=1))
+plt.plot(excess_returns.index,in_the_sample_predict.values)
+plt.legend(['true','prediction'])
+plt.show()
+'''
 
+#for out of sample
+rx=excess_returns.mean(axis=1)
+n=20
+#prediction=pd.DataFrame(0,excess_returns.index,columns=['prediction'])
+prediction=list()
+for i in range(n,len(excess_returns)):
+    Y=rx.values[0:i]
+    X=forward.values[0:i,:]
+    lr=sm.OLS(Y,X).fit()
+    prediction.append(lr.predict(forward.values[i,:])[0])
+    
+r2=r2_score(np.array(prediction),rx.values[n:])
+result=pd.DataFrame(np.hstack([np.array(prediction).reshape(-1,1),rx.values[n:].reshape(-1,1)]).astype(np.float64),
+                    index=rx.index[n:],columns=['prediction','true'])
+result['hold']=(result['prediction']>0)*result['true']
+result['total_return']=np.exp(result['hold']+log_returns.iloc[n:,0]).cumprod()
+'''
+plt.figure()
+#plt.plot(result.index,result['total_return'])
+plt.plot(rx.index[n:],rx.values[n:])
+plt.plot(rx.index[n:],prediction.values[n:])
+plt.legend(['true','prediction'])
+plt.show()
+'''
 #returns=return_FRB
 
 '''
