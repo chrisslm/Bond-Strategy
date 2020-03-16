@@ -41,6 +41,9 @@ australian_maturities    = [0.083333, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
 canada_maturities        = [0.083333, 0.25, 0.5, 1, 2, 3, 4, 5, 7, 10, 20, 30];
 uk_maturities            = [0.083333, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 30, 40];
 
+% choose respective country
+country_maturities = swiss_maturities;
+
 %% Load Bond Return Data
 
 % Load returns of all bonds (we colud include it in a script so that the
@@ -50,35 +53,34 @@ uk_maturities            = [0.083333, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 10, 15,
 
 % do necessary transformations and extract the dates and column names of
 % each return series
-swiss_returns   = readtable('Swiss_Return_Final.xls');
-swiss_dates     = table2array(swiss_returns(:, 1));
-swiss_tickers   = swiss_returns.Properties.VariableNames(2 : end);
-swiss_returns   = table2array(swiss_returns(:, 2 : end));
+country_returns   = readtable('Swiss_Return_Final.xls');
+country_dates     = table2array(country_returns(:, 1));
+country_tickers   = country_returns.Properties.VariableNames(2 : end);
+country_returns   = table2array(country_returns(:, 2 : end));
 
 % also read the get the yields for every country
-swiss_yields    = xlsread('Swiss Yields desired format.xls');
-swiss_yields    = swiss_yields(:, 2 : end);
+country_yields    = xlsread('Swiss Yields desired format.xlsx');
+country_yields    = country_yields(:, 2 : end);
 
 % Set important variables per series
 % counts number of different maturities per country
-swiss_nMat      = length(swiss_returns(1, :));
+country_nMat      = length(country_returns(1, :));
 
 % counts the number of dates / observations per country
-swiss_obs       = length(swiss_dates);
+country_obs       = length(country_dates);
 
 %% Check Return Availability
 
 % check when the individual series start
-swiss_avail = (swiss_yields > -1);
-swiss_count_avail = sum(swiss_avail, 2);
+country_avail = (country_yields > -1);
+country_count_avail = sum(country_avail, 2);
 
 %% Compute Dollar Evolution
 
 % This section computes for all return series the evolution of an
 % investment of 1 unit of currency in each of the return series.
-swiss_returns(isnan(swiss_returns)) = 0;
-swiss_nav = cumprod(1 + swiss_returns .* swiss_avail);
-swiss_nav = [ones(1, swiss_nMat); swiss_nav];
+country_returns(isnan(country_returns)) = 0;
+country_nav = cumprod(1 + country_returns .* country_avail);
 
 %% Optional Plots
 
@@ -86,7 +88,7 @@ swiss_nav = [ones(1, swiss_nMat); swiss_nav];
 
 if plot_var == 1
     figure(1)
-    semilogy(swiss_dates, swiss_nav);
+    semilogy(country_dates, country_nav);
 end
 
 %% Factor Setup
@@ -103,53 +105,143 @@ end
 % and nShorts are defined above
 
 if nLongs < 1
-    nLongs_swiss    = floor(nLongs * swiss_nMat);
-    nShorts_swiss   = floor(nShorts * swiss_nMat);
+    country_nLongs    = floor(nLongs * country_nMat);
+    country_nShorts   = floor(nShorts * country_nMat);
 else
-    nLongs_swiss    = nLongs;
-    nShorts_swiss   = nShorts;
+    country_nLongs    = nLongs;
+    country_nShorts   = nShorts;
 end
+
+%% Check Availability for Longs and Shorts
+
+% create a series of available count for longs and shorts and slice these
+% for the other factors
+country_strat_count = floor(country_count_avail / 2);
+country_nShorts = country_nShorts .* (country_nShorts <= country_strat_count) + country_strat_count .* (country_nShorts > country_strat_count);
+country_nLongs = country_nLongs .* (country_nLongs <= country_strat_count) + country_strat_count .* (country_nLongs > country_strat_count);
+
 
 %% Momentum Factor Construction (within country)
 
+% check for availability of the momentum factor, meaning which maturity was
+% available 1 year ago.
+country_mom_avail = country_avail(1 : end - year_frac + 1, :);
+
 % calculate yearly returns with country NAVs
-swiss_mom_dates = swiss_dates(year_frac : end);
-swiss_yearly    = swiss_nav(year_frac : end, :) ./ swiss_nav(1 : end - year_frac + 1, :) - 1;
+country_mom_dates = country_dates(year_frac : end);
+country_yearly    = (country_nav(year_frac : end, :) ./ country_nav(1 : end - year_frac + 1, :) - 1) .* country_mom_avail;
+
+% compare number of longs and shorts with actual available securities and
+% calculate the maximum number of securities on could go long or short at
+% each time point. country_mom_count is the maximum number of either longs or
+% shorts one could invest into as it reflects half of the assets.
+country_mom_nShorts = country_nShorts(1 : end - year_frac + 1);
+country_mom_nLongs = country_nLongs(1 : end - year_frac + 1);
 
 % Calculate the nth largest and smallest return
-swiss_min_ret       = mink(swiss_yearly', nShorts_swiss)';
-swiss_min_ret       = swiss_min_ret(:, end);
+country_min_ret = zeros(length(country_yearly), 1);
+country_max_ret = zeros(length(country_yearly), 1);
 
-swiss_max_ret       = maxk(swiss_yearly', nLongs_swiss)';
-swiss_max_ret       = swiss_max_ret(:, end);
+for i = 1 : length(country_yearly)
+    relevant_ret = nonzeros(country_yearly(i, :) .* country_mom_avail(i, :));
+    min_el = mink(relevant_ret, country_mom_nShorts(i));
+    max_el = maxk(relevant_ret, country_mom_nLongs(i));
+    country_min_ret(i) = min_el(end);
+    country_max_ret(i) = max_el(end);
+end
 
 % Generate the indicator matrices per country
-swiss_long_mom  = (swiss_yearly >= swiss_max_ret) / nLongs_swiss;
-swiss_short_mom = -1 * (swiss_yearly <= swiss_min_ret) / nShorts_swiss;
-swiss_ls_mom    = swiss_long_mom + swiss_short_mom;
+country_long_mom  = (country_yearly >= country_max_ret) .* country_mom_avail ./ country_mom_nLongs;
+country_short_mom = -1 * (country_yearly <= country_min_ret) .* country_mom_avail ./ country_mom_nShorts;
+country_ls_mom    = country_long_mom + country_short_mom;
 
 %% Low Volatility Factor Construction (within country)
 
 % Calculate the duration for each country
-swiss_duration = getbondduration(swiss_yields, swiss_maturities);
+country_duration = getbondduration(country_yields, country_maturities);
 
 % Calculate the low volatility factor
-swiss_lvol_factor = swiss_duration .* swiss_yields;
+country_lvol_factor = country_duration .* country_yields;
 
-% Calculate the nth largest and smallest factor
-swiss_min_vol       = mink(swiss_lvol_factor', nShorts_swiss)';
-swiss_min_vol       = swiss_min_vol(:, end);
 
-swiss_max_vol       = maxk(swiss_lvol_factor', nLongs_swiss)';
-swiss_max_vol       = swiss_max_vol(:, end);
+% Calculate the nth largest and smallest vol
+country_min_vol = zeros(length(country_lvol_factor), 1);
+country_max_vol = zeros(length(country_lvol_factor), 1);
+
+for i = 1 : length(country_lvol_factor)
+    relevant_vol = nonzeros(country_lvol_factor(i, :) .* country_avail(i, :));
+    min_el = mink(relevant_vol, country_nShorts(i));
+    max_el = maxk(relevant_vol, country_nLongs(i));
+    country_min_vol(i) = min_el(end);
+    country_max_vol(i) = max_el(end);
+end
 
 % Generate the indicator matrices per country
-swiss_long_vol  = (swiss_lvol_factor <= swiss_min_vol) / nLongs_swiss;
-swiss_short_vol = -1 * (swiss_lvol_factor >= swiss_max_vol) / nShorts_swiss;
-swiss_ls_vol    = swiss_long_vol + swiss_short_vol;
+country_long_vol  = (country_lvol_factor <= country_min_vol) ./ country_nLongs;
+country_short_vol = -1 * (country_lvol_factor >= country_max_vol) ./ country_nShorts;
+country_ls_vol    = country_long_vol + country_short_vol;
 
 %% Value Factor Construction (within country)
 
+% check for availability of the momentum factor, meaning which maturity was
+% available 1 year ago.
+country_val_avail = country_avail(1 : end - year_frac * 5 + 1, :);
+
 % calculate the yield difference
 
-swiss_yielddiff = swiss_yields(year_frac * 5 : end, :) - swiss_yields(1 : end - year_frac * 5 + 1, :);
+country_yielddiff = country_yields(year_frac * 5 : end, :) - country_yields(1 : end - year_frac * 5 + 1, :);
+
+% compare number of longs and shorts with actual available securities and
+% calculate the maximum number of securities on could go long or short at
+% each time point. country_mom_count is the maximum number of either longs or
+% shorts one could invest into as it reflects half of the assets.
+country_val_nShorts = country_nShorts(1 : end - year_frac * 5 + 1);
+country_val_nLongs = country_nLongs(1 : end - year_frac * 5 + 1);
+
+% Calculate the nth largest and smallest value
+country_min_val = zeros(length(country_yielddiff), 1);
+country_max_val = zeros(length(country_yielddiff), 1);
+
+for i = 1 : length(country_yielddiff)
+    relevant_val = nonzeros(country_yielddiff(i, :) .* country_val_avail(i, :));
+    min_el = mink(relevant_val, country_val_nShorts(i));
+    max_el = maxk(relevant_val, country_val_nLongs(i));
+    country_min_val(i) = min_el(end);
+    country_max_val(i) = max_el(end);
+end
+
+% Generate the indicator matrices per country
+country_long_val  = (country_yielddiff <= country_min_val) ./ country_val_nLongs;
+country_short_val = -1 * (country_yielddiff >= country_max_val) ./ country_val_nShorts;
+country_ls_val    = country_long_val + country_short_val;
+
+%% Test Factor
+
+% get all factors to the same length. As value is the shortest, all
+% timelines will be amended
+
+country_lvol_factor_l = sum(country_long_vol(1 : end - 1, :) .* country_returns(2 : end, :), 2);
+country_lvol_factor_l = cumprod(1 + country_lvol_factor_l);
+country_lvol_factor_l = [1; country_lvol_factor_l];
+figure(1)
+plot(country_lvol_factor_l)
+
+country_mom_factor_l = sum(country_long_mom(1 : end - 1, :) .* country_returns(year_frac + 1 : end, :), 2);
+country_mom_factor_l = cumprod(1 + country_mom_factor_l);
+country_mom_factor_l = [1; country_mom_factor_l];
+figure(2)
+plot(country_mom_factor_l)
+
+country_val_factor_l = sum(country_long_val(1 : end - 1, :) .* country_returns(year_frac * 5 + 1 : end, :), 2);
+country_val_factor_l = cumprod(1 + country_val_factor_l);
+country_val_factor_l = [1; country_val_factor_l];
+figure(3)
+plot(country_val_factor_l)
+
+
+factor_matrix = [country_val_factor_l country_lvol_factor_l(5 * year_frac : end) country_mom_factor_l(4 * year_frac + 1 : end)];
+factor_returns = factor_matrix(2 : end, :) ./ factor_matrix(1 : end - 1, :) - 1;
+factor_nav = cumprod(1 + sum(factor_returns, 2) / 3);
+factor_nav = [1; factor_nav];
+figure(4)
+plot(factor_nav)
