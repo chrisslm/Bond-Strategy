@@ -84,6 +84,9 @@ country_count_avail = sum(country_avail, 2);
 country_avail = ([cumXsR(2 : end, :) ; ones(1, nBonds)] > -1);
 country_count_avail = sum(country_avail, 2);
 
+% equally weightes
+equal_strategy = country_avail ./ country_count_avail;
+
 %% Compute Dollar Evolution
 
 % This section computes for all return series the evolution of an
@@ -268,6 +271,13 @@ country_car_factor_l = sum(country_long_car(1 : end - 1, :) .* country_returns(2
 country_car_factor_l = cumprod(1 + country_car_factor_l);
 country_car_factor_l = [1; country_car_factor_l];
 
+equal_weighted = sum(equal_strategy(1 : end - 1, :) .* country_returns(2 : end, :), 2);
+equal_weighted = cumprod(1 + equal_weighted);
+equal_weighted = [1; equal_weighted];
+equal_weighted = equal_weighted(5 * year_frac : end);
+equal_returns = equal_weighted(2 : end) ./ equal_weighted(1 : end - 1) - 1;
+equal_nav = cumprod(1 + equal_returns);
+equal_nav = [1; equal_nav];
 
 factor_matrix = [country_val_factor_l country_car_factor_l(5 * year_frac : end) country_lvol_factor_l(5 * year_frac : end) country_mom_factor_l(4 * year_frac + 1 : end)];
 factor_returns = factor_matrix(2 : end, :) ./ factor_matrix(1 : end - 1, :) - 1;
@@ -280,12 +290,20 @@ factor_matrix = cumprod(1 + factor_returns);
 factor_matrix = [factor_matrix factor_nav];
 
 country_dates = country_dates(5 * year_frac : end);
-plot(country_dates, factor_matrix(:, 1), '-.g', country_dates, factor_matrix(:, 2), '-.r', country_dates, factor_matrix(:, 3), '-.b', country_dates, factor_matrix(:, 4), '-.m', country_dates, factor_matrix(:, 5), '-k','LineWidth',1) 
-legend('Low Volatility', 'Momentum', 'Value', 'Carry', 'Combo','Location','northwest')
+
+figure(1)
+plot(country_dates, factor_matrix(:, 1), '-r', country_dates, factor_matrix(:, 2), '-k', country_dates, factor_matrix(:, 3), '-g',country_dates, factor_matrix(:, 4), '-b','LineWidth',1) 
+legend('Low Volatility', 'Momentum', 'Value', 'Carry', 'Location','northwest')
+
+figure(2)
+plot(country_dates, factor_matrix(:, 5), '-.r', country_dates, equal_nav,'-.k','LineWidth',1)
+legend('Combo', 'Equal', 'Location','northwest')
 %% Performance Calc
 
 factor_returns = factor_matrix(2 : end, :) ./ factor_matrix(1 : end - 1, :) - 1;
+equal_returns = equal_nav(2 : end) ./ equal_nav(1 : end - 1) - 1;
+factor_returns = [factor_returns equal_returns];
 
-summarizePerformance(factor_returns, cumRf(5 * year_frac + 1 : end),factor_returns(:, end),12,'Low Vola, Mom, Value, Carry, Combo')
+summarizePerformance(factor_returns, cumRf(5 * year_frac + 1 : end),factor_returns(:, end),12,'Low Vola, Mom, Value, Carry, Combo, Equal')
 
 

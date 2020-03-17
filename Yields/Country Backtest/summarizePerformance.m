@@ -45,11 +45,12 @@ totalReturns = 100 * totalReturns;
 disp(['Performance Statistics for ' txt]);
 ArithmAvgTotalReturn = mean(totalReturns)
 ArithmAvgXsReturn = mean(xsReturns)
-StdXsReturns = std(xsReturns)
+StdXsReturns = std(xsReturns); 
 SharpeArithmetic = sqrt(annualizationFactor) * ArithmAvgXsReturn ./ StdXsReturns
-GeomAvgTotalReturn
-GeomAvgXsReturn
 SharpeGeometric = sqrt(annualizationFactor) * GeomAvgXsReturn ./ StdXsReturns
+StdXsReturns = std(xsReturns) * sqrt(annualizationFactor)
+GeomAvgTotalReturn = ((1 + GeomAvgTotalReturn ./ 100).^annualizationFactor - 1) .* 100
+GeomAvgXsReturn = ((1 + GeomAvgXsReturn  ./ 100).^annualizationFactor - 1) .* 100
 MinXsReturn = min(xsReturns)
 MaxXsReturn = max(xsReturns)
 SkewXsReturn = skewness(xsReturns)
