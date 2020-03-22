@@ -194,14 +194,34 @@ return1=return1.loc[factor1.index]
 factor1['return']=return1['10Y']
 US=factor1.dropna(axis=0,how='any')
 ############################################################
+
 #%%
 US=US.loc[US.index.year>=1995]
 US=US.iloc[:-1,:]
 US.index=German.index
 Australian=Australian.loc[Australian.index.year>=1995]
-country=[Australian,Canada,China,France,German,Italy,Japan, South_korea,Spain, Swiss,UK,US]
-country_name=['Australian','Canada','China','France','German','Italy','Japan', 'South_korea','Spain', 'Swiss','UK','US']
+country=[Australian,Canada,France,German,Italy,Japan, South_korea, Swiss,UK,US]
+country_name=['Australian','Canada','France','German','Italy','Japan', 'South_korea', 'Swiss','UK','US']
 # basic regression
+
+#%%future returns
+future_returns = pd.read_excel('future_monthly.xlsx')
+future_returns['Dates'] = future_returns['Dates'].astype(str)
+future_returns['Dates'] = future_returns['Dates'].apply(lambda x:datetime.strptime(x, '%Y%m%d'))
+future_returns = future_returns.set_index('Dates')
+future_returns = future_returns.shift(-1,axis=0)
+future_returns = future_returns.iloc[:-2,:]
+future_returns = future_returns.loc[future_returns.index.year>=1995]
+future_returns.index = German.index
+
+for i in range(len(country)):
+    name = country_name[i]
+    df = country[i]
+    country[i]['future_return']= future_returns.loc[df.index][name]
+
+France = France.dropna(axis=0,how='any')
+Italy = Italy.dropna(axis=0,how='any')
+South_korea = South_korea.dropna(axis=0,how='any')
 #%% riskfree
 rf=pd.read_csv('fama_french.csv')
 rf['Dates']=rf['Dates'].astype(str)
@@ -211,9 +231,9 @@ rf=rf.set_index('Dates')
 rf.index=German.index
 rf=(rf/100).astype(np.float64)
 
-
 for df in country:
-    df['excess_return']=df['return']-rf.loc[df.index]['RF']
+    df['total_return']=df['future_return']+rf.loc[df.index]['RF']
+
 #%%
 for df in country:
     #for out of sample, expanding window
@@ -221,7 +241,7 @@ for df in country:
     pre1=np.zeros(len(df))
     pre2=np.zeros(len(df))
     for i in range(n,len(df)):
-        Y=(df['excess_return']).values[:i]
+        Y=(df['future_return']).values[:i]
         X1=df.iloc[:i,:-4].values
         X2=df['spread'].values[:i].reshape(-1,1)
         lr1=LinearRegression().fit(X1,Y)
@@ -249,7 +269,7 @@ for i in range(len(country)):
     fb1[country_name[i]]=df['pre_FB'].values
     return01=pd.DataFrame()
     return01['Dates']=df.index
-    return01[country_name[i]]=df['return'].values
+    return01[country_name[i]]=df['total_return'].values
     CP=pd.merge(CP,cp1,on='Dates',how='outer')
     FB=pd.merge(FB,fb1,on='Dates',how='outer')
     returns=pd.merge(returns,return01,on='Dates',how='outer')
