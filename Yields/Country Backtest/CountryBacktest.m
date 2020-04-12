@@ -367,3 +367,40 @@ factor_returns = [factor_returns equal_returns];
 summarizePerformance(factor_returns, cumRf(5 * year_frac + 1 : end),factor_returns(:, end),12,'Low Vola, Mom, Value, Carry, Size, Quality, Combo, Equal')
 
 
+%% Factor Rotation based on Momentum
+% LS = xlsread('factor_returns_ls.xls');
+% EWLS = LS(end-288+1:end,8);
+% LS = LS(:,1:6);
+L = factor_returns(:,1:6);
+EWLong = factor_returns(:,8);
+% LandLS = [L LS];
+% MomentumLS = zeros(length(LS)-12,6);
+MomentumLong = zeros(length(L)-12,6);
+% MomentumLandLS = zeros(length(LS)-12,12);
+
+for i = 1:length(MomentumLong)
+%     MomentumLS(i,:) = mean(LS(i:i+11,:));
+     MomentumLong(i,:) = mean(L(i:i+11,:));
+%     MomentumLandLS(i,:) = mean(LandLS(i:i+11,:));
+end
+logicalLong = zeros(length(MomentumLong),6);
+% logicalLS = zeros(length(MomentumLS),6);
+% logicalLandLS = zeros(length(MomentumLS),12);
+for j = 1:length(MomentumLong)
+    maxL = max(MomentumLong(j,:));
+%     maxLS = max(MomentumLS(j,:));
+%     maxLandLS = max(MomentumLandLS(j,:));
+    logicalLong(j,:) = (MomentumLong(j,:) == maxL);
+%     logicalLS(j,:) = (MomentumLS(j,:) == maxLS);
+%     logicalLandLS(j,:) = (MomentumLandLS(j,:) == maxLandLS);
+end
+MomentumLong_ret = sum(logicalLong(1:end-1,:).*L(end-length(logicalLong)+2:end,:),2);
+% MomentumLS_ret = sum(logicalLS(1:end-1,:).*LS(end-288+1:end,:),2);
+% MomentumLandLS_ret = sum(logicalLandLS(1:end-1,:).*LandLS(end-288+1:end,:),2);
+date = country_dates(end-length(MomentumLong_ret)+1:end);
+EWLong = EWLong(end-length(MomentumLong_ret)+1:end);
+figure(3)
+plot(date,cumprod(1+MomentumLong_ret),'-.b',date,cumprod(1+EWLong),'-.k','LineWidth', 1)
+% ,date,cumprod(1+MomentumLS_ret),'-.r',date,cumprod(1+MomentumLandLS_ret),'-.g',date,cumprod(1+EWLong),'-.k','LineWidth', 1),
+legend('FactorRotationLong', 'EW', 'Location', 'northwest')
+% ,'FactorRotationLS', 'FactorRotationCombined', 'EW','Location','northwest')
