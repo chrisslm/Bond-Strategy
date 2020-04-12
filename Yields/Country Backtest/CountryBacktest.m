@@ -249,10 +249,12 @@ country_ls_car    = country_long_car + country_short_car;
 
 %% Size Factor
 % Load Size Variables per Country
-country_size_data = readtable('Size_GDP.xlsx');
-country_size_data = table2array(country_size_data(end-length(country_returns)-7+1:end-7,2:end));
+% old size
+%country_size_data = readtable('Size_GDP.xlsx');
+country_size_data = readtable('Size_Factor_New_PPP.xlsx');
+country_size_data = table2array(country_size_data(1:end-7,2:end));
 % Take right countries in the right colums
-country_size = zeros(length(country_returns), nBonds);
+country_size = zeros(length(country_size_data), nBonds);
 country_size(:,1) = country_size_data(:,8);
 country_size(:,2) = country_size_data(:,5);
 country_size(:,3) = country_size_data(:,2);
@@ -268,7 +270,7 @@ country_size(:,12) = country_size_data(:,11);
 country_size(isnan(country_size)) = 0;
 %look if returns are available
 logical_returns = (country_returns ~= 0);
-country_size = country_size.*logical_returns;
+country_size = country_size.*logical_returns(end-length(country_size_data)+1:end,:);
 country_size_weights = country_size./sum(country_size,2);
 country_size_weights(isnan(country_size_weights))=0;
 
@@ -331,7 +333,7 @@ equal_returns = equal_weighted(2 : end) ./ equal_weighted(1 : end - 1) - 1;
 equal_nav = cumprod(1 + equal_returns);
 equal_nav = [1; equal_nav];
 
-country_size_factor_l = sum(country_size_weights.*country_returns,2);
+country_size_factor_l = sum(country_size_weights.*country_returns(end-length(country_size_weights)+1:end,:),2);
 country_size_factor_l = cumprod(1+country_size_factor_l);
 
 country_quality_factor_l = sum(country_quality_weights.*country_returns(end-length(country_quality_weights)+1:end,:),2);
