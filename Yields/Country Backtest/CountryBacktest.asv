@@ -170,7 +170,6 @@ country_ls_mom    = country_long_mom + country_short_mom;
 %% Low Volatility Factor Construction 
 
 % Calculate the low volatility factor
-% Taking past 12 month volatility of yields * duration
 hist_vol_yields = zeros(length(country_duration)-12, 12);
 for m = 1:length(hist_vol_yields)
     hist_vol_yields(m,:) = var(country_yields(m:11+m));
@@ -193,6 +192,7 @@ end
 country_long_vol  = (country_lvol_factor <= country_min_vol) ./ country_nLongs(13:end);
 country_short_vol = -1 * (country_lvol_factor >= country_max_vol) ./ country_nShorts(13:end);
 country_ls_vol    = country_long_vol + country_short_vol;
+return
 %% Value Factor Construction
 
 % check for availability of the momentum factor, meaning which maturity was
@@ -229,7 +229,7 @@ country_ls_val    = country_long_val + country_short_val;
 
 %% Carry Factor
 
-% Calculate the carry factor
+% Calculate the low volatility factor
 country_carry = country_yields - short_yields;
 
 
@@ -252,10 +252,11 @@ country_ls_car    = country_long_car + country_short_car;
 
 %% Size Factor
 % Load Size Variables per Country
-% old size country_size_data = readtable('Size_GDP.xlsx');
+% old size
+%country_size_data = readtable('Size_GDP.xlsx');
 country_size_data = readtable('Size_Factor_New_PPP.xlsx');
 country_size_data = table2array(country_size_data(1:end-7,2:end));
-% Take right countries into right colums
+% Take right countries in the right colums
 country_size = zeros(length(country_size_data), nBonds);
 country_size(:,1) = country_size_data(:,8);
 country_size(:,2) = country_size_data(:,5);
@@ -308,9 +309,10 @@ country_quality_weights = country_quality./sum(country_quality,2);
 % get all factors to the same length. As value is the shortest, all
 % timelines will be amended
 
-country_lvol_factor_l = sum(country_long_vol(1 : end - 1, :) .* country_returns(14 : end, :), 2);
+country_lvol_factor_l = sum(country_long_vol(1 : end - 1, :) .* country_returns(2 : end, :), 2);
 country_lvol_factor_l = cumprod(1 + country_lvol_factor_l);
 country_lvol_factor_l = [1; country_lvol_factor_l];
+
 
 country_mom_factor_l = sum(country_long_mom(1 : end - 1, :) .* country_returns(year_frac + 1 : end, :), 2);
 country_mom_factor_l = cumprod(1 + country_mom_factor_l);
@@ -339,7 +341,7 @@ country_size_factor_l = cumprod(1+country_size_factor_l);
 
 country_quality_factor_l = sum(country_quality_weights.*country_returns(end-length(country_quality_weights)+1:end,:),2);
 country_quality_factor_l = cumprod(1+country_quality_factor_l);
-factor_matrix = [country_val_factor_l country_car_factor_l(5 * year_frac : end) country_lvol_factor_l(4 * year_frac : end) country_mom_factor_l(4 * year_frac + 1 : end) country_size_factor_l(end-302+1:end) country_quality_factor_l(end-302+1:end)];
+factor_matrix = [country_val_factor_l country_car_factor_l(5 * year_frac : end) country_lvol_factor_l(5 * year_frac : end) country_mom_factor_l(4 * year_frac + 1 : end) country_size_factor_l(end-302+1:end) country_quality_factor_l(end-302+1:end)];
 factor_returns = factor_matrix(2 : end, :) ./ factor_matrix(1 : end - 1, :) - 1;
 factor_nav = cumprod(1 + sum(factor_returns, 2) / 6);
 factor_nav = [1; factor_nav];
