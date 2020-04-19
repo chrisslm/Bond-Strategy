@@ -1,5 +1,54 @@
 clear
 clc
+
+%% Loading Data
+%Factors
+%Size
+country_size_data = readtable('Size_Factor_New_PPP.xlsx');
+country_size_data = table2array(country_size_data(:,2:end));
+%Quality
+country_quality_data = readtable('Quality_Score.xlsx');
+country_quality_data = table2array(country_quality_data(:,2:end));
+
+%Others
+rf = readtable('3 month rates.xlsx');
+rf = table2array(rf(:, 2 : end));
+FXrates = readtable('Exchange_rates_to_Euro.xlsx');
+FXrates = table2array(FXrates(:, 2 : end));
+
+%Yields per Country
+Germany_yields = xlsread('German Yield.xls');
+Italy_yields = xlsread('Italy Yields.xls');
+France_yields = xlsread('France Yields.xls');
+Spain_yields = xlsread('Spain Yields.xls');
+Switzerland_yields = xlsread('Swiss Yields.xls');
+UK_yields = xlsread('UK Yields.xls');
+China_yields = xlsread('china yield.xls');
+Japan_yields = xlsread('Japan Yields.xls');
+SK_yields = xlsread('south korea yields.xls');
+Australia_yields = xlsread('Australian Yields.xls');
+US_yields = xlsread('Yield_quandl.xls');
+Canada_yields = xlsread('Canada yields.xls');
+
+%Yields per Maturity
+nBonds = size(country_quality_data,2);
+maturities = size(Australia_yields,2);
+nMonths = 722;
+yield_matrix = nan(nMonths,maturities*nBonds);
+for i = 1:20
+        yield_matrix(end-length(Germany_yields)+1:end,(i-1)*nBonds+1) = Germany_yields(:,i);
+        yield_matrix(end-length(Italy_yields)+1:end,(i-1)*nBonds+2) = Italy_yields(:,i);
+        yield_matrix(end-length(France_yields)+1:end,(i-1)*nBonds+3) = France_yields(:,i);
+        yield_matrix(end-length(Spain_yields)+1:end,(i-1)*nBonds+4) = Spain_yields(:,i);
+        yield_matrix(end-length(Switzerland_yields)+1:end,(i-1)*nBonds+5) = Switzerland_yields(:,i);
+        yield_matrix(end-length(UK_yields)+1:end,(i-1)*nBonds+6) = UK_yields(:,i);
+        yield_matrix(end-length(China_yields)+1:end,(i-1)*nBonds+7) = China_yields(:,i);
+        yield_matrix(end-length(Japan_yields)+1:end,(i-1)*nBonds+8) = Japan_yields(:,i);
+        yield_matrix(end-length(SK_yields)+1:end,(i-1)*nBonds+9) = SK_yields(:,i);
+        yield_matrix(end-length(Australia_yields)+1:end,(i-1)*nBonds+10) = Australia_yields(:,i);
+        yield_matrix(end-length(US_yields)+1:end,(i-1)*nBonds+11) = US_yields(:,i);
+        yield_matrix(end-length(Canada_yields)+1:end,(i-1)*nBonds+12) = Canada_yields(:,i);
+end
 %% Control Relevant Variables
 
 % For long-short factor construction, either integer or fraction. That
@@ -27,28 +76,29 @@ plot_var = 0;
 
 %% Load Bond Return Data
 
-% get the yields for every country
-country_yields = readtable('Country10yields.xlsx');
-country_dates = table2array(country_yields(:, 1));
-country_yields = table2array(country_yields(:, 2 : end));
-
-short_yields = readtable('3 month rates.xlsx');
-short_yields = table2array(short_yields(:, 2 : end));
-
-maturities = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
-
-% Set important variables per series
-% counts number of different maturities per country
-nBonds = length(country_yields(1, :));
-
+% get the yields for every maturity
+% choose maturity 0 = 1m, 1 = 3m, 2 = 6m, 3 = 1y, 4 = 2y, 5 = 3y, 6 = 4y
+% 7 = 5y, 8 = 6y, 9 = 7y, 10 = 8y, 11 = 9y, 12 = 10y, 13 = 11y, 14 = 12y,
+% 15 = 13y, 16 = 14y, 17 = 15y, 18 = 20y, 19 = 30y
+maturity_number = 5;
+maturities_possible = [1/12, 1/4, 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 30];
+maturity_chosen = maturities_possible(maturity_number+1);
+desired_years = 30;
+maturities_vector = maturity_chosen.*ones(1,nBonds);
+country_yields = yield_matrix(:,nBonds*maturity_number+1:nBonds*maturity_number+nBonds);
 % counts the number of dates / observations per country
-country_obs       = length(country_dates);
+country_obs = length(country_yields);
 
 % Use the functions to calculate the returns and durations
-country_duration = getbondduration(country_yields, maturities);
-country_returns = getbondreturns(country_yields, maturities, 1);
+country_duration = getbondduration(country_yields, maturities_vector);
+country_returns = getbondreturns(country_yields, maturities_vector, 1);
 country_returns = [zeros(1, nBonds); country_returns];
-
+country_returns(isnan(country_returns)) = 0;
+country_returns = cumprod(1+country_returns(end-desired_years*12+1:end,:));
+figure(1)
+plot(country_returns),
+legend("GER", "ITA", "FRA", "ESP", "SWI", "UK", "CHN", "JAP", "SK", "AUS", "US", "CAN", "location", "northwest")
+return
 %% Load Futures Data
 
 futures_prices = readtable('Country Futures.xlsx');
@@ -170,16 +220,12 @@ country_ls_mom    = country_long_mom + country_short_mom;
 %% Low Volatility Factor Construction 
 
 % Calculate the low volatility factor
-<<<<<<< HEAD
 % Taking past 12 month volatility of yields * duration
 hist_vol_yields = zeros(length(country_duration)-12, 12);
 for m = 1:length(hist_vol_yields)
     hist_vol_yields(m,:) = var(country_yields(m:11+m));
 end
 country_lvol_factor = country_duration(13:end,:) .* hist_vol_yields;
-=======
-country_lvol_factor = country_duration .* country_yields;
->>>>>>> master
 
 % Calculate the nth largest and smallest vol
 country_min_vol = zeros(length(country_lvol_factor), 1);
@@ -194,13 +240,13 @@ for i = 1 : length(country_lvol_factor)
 end
 
 % Generate the indicator matrices per country
-<<<<<<< HEAD
+
 country_long_vol  = (country_lvol_factor <= country_min_vol) ./ country_nLongs(13:end);
 country_short_vol = -1 * (country_lvol_factor >= country_max_vol) ./ country_nShorts(13:end);
-=======
+
 country_long_vol  = (country_lvol_factor <= country_min_vol) .* country_avail ./ country_nLongs;
 country_short_vol = -1 * (country_lvol_factor >= country_max_vol) .* country_avail ./ country_nShorts;
->>>>>>> master
+
 country_ls_vol    = country_long_vol + country_short_vol;
 %% Value Factor Construction
 
@@ -260,33 +306,6 @@ country_short_car = -1 * (country_carry <= country_min_car) .* country_avail ./ 
 country_ls_car    = country_long_car + country_short_car;
 
 %% Size Factor
-% Load Size Variables per Country
-<<<<<<< HEAD
-% old size country_size_data = readtable('Size_GDP.xlsx');
-country_size_data = readtable('Size_Factor_New_PPP.xlsx');
-country_size_data = table2array(country_size_data(1:end-7,2:end));
-% Take right countries into right colums
-country_size = zeros(length(country_size_data), nBonds);
-=======
-country_size_data = readtable('Size_new.xlsx');
-country_size_dates = table2array(country_size_data(end - length(country_returns) - 7 + 1 : end - 7, 1));
-country_size_data = table2array(country_size_data(end - length(country_returns) - 7 + 1 : end - 7, 2 : end));
-
-% Take right countries in the right colums
-country_size = zeros(length(country_returns), nBonds);
->>>>>>> master
-country_size(:,1) = country_size_data(:,8);
-country_size(:,2) = country_size_data(:,5);
-country_size(:,3) = country_size_data(:,2);
-country_size(:,4) = country_size_data(:,10);
-country_size(:,5) = country_size_data(:,1);
-country_size(:,6) = country_size_data(:,6);
-country_size(:,7) = country_size_data(:,4);
-country_size(:,8) = country_size_data(:,9);
-country_size(:,9) = country_size_data(:,12);
-country_size(:,10) = country_size_data(:,7);
-country_size(:,11) = country_size_data(:,3);
-country_size(:,12) = country_size_data(:,11);
 country_size(isnan(country_size)) = 0;
 country_size_dummy = country_size;
 %look if returns are available
@@ -313,25 +332,7 @@ country_short_size = -1 * (country_size_dummy <= country_min_size) .* country_av
 country_ls_size    = country_long_size + country_short_size;
 
 %% Quality Factor
-% Load Quality Variables per Country
-country_quality_data = readtable('Quality_Score.xlsx');
-country_quality_dates = table2array(country_quality_data(1 : end - 17, 1));
-country_quality_data = table2array(country_quality_data(1 : end - 17, 2 : end));
 quality_avail = (country_quality_data > -10);
-% Take right countries in the right colums
-country_quality = zeros(length(country_quality_data), nBonds);
-country_quality(:,1) = country_quality_data(:,8);
-country_quality(:,2) = country_quality_data(:,5);
-country_quality(:,3) = country_quality_data(:,2);
-country_quality(:,4) = country_quality_data(:,10);
-country_quality(:,5) = country_quality_data(:,1);
-country_quality(:,6) = country_quality_data(:,6);
-country_quality(:,7) = country_quality_data(:,4);
-country_quality(:,8) = country_quality_data(:,9);
-country_quality(:,9) = country_quality_data(:,12);
-country_quality(:,10) = country_quality_data(:,7);
-country_quality(:,11) = country_quality_data(:,3);
-country_quality(:,12) = country_quality_data(:,11);
 country_quality(isnan(country_quality)) = 0;
 %look if returns are available
 country_quality = country_quality.*logical_returns(end-length(country_quality)+1:end,:);
@@ -378,14 +379,14 @@ equal_returns = equal_weighted(2 : end) ./ equal_weighted(1 : end - 1) - 1;
 equal_nav = cumprod(1 + equal_returns);
 equal_nav = [1; equal_nav];
 
-<<<<<<< HEAD
+
 country_size_factor_l = sum(country_size_weights.*country_returns(end-length(country_size_weights)+1:end,:),2);
 country_size_factor_l = cumprod(1+country_size_factor_l);
 
 country_quality_factor_l = sum(country_quality_weights.*country_returns(end-length(country_quality_weights)+1:end,:),2);
 country_quality_factor_l = cumprod(1+country_quality_factor_l);
 factor_matrix = [country_val_factor_l country_car_factor_l(5 * year_frac : end) country_lvol_factor_l(4 * year_frac : end) country_mom_factor_l(4 * year_frac + 1 : end) country_size_factor_l(end-302+1:end) country_quality_factor_l(end-302+1:end)];
-=======
+
 country_size_factor_l = sum(country_long_size .* country_returns, 2);
 country_size_factor_l = cumprod(1 + country_size_factor_l);
 
@@ -393,7 +394,7 @@ country_quality_factor_l = sum(country_long_qual .* country_returns(end - length
 country_quality_factor_l = cumprod(1 + country_quality_factor_l);
 
 factor_matrix = [country_val_factor_l country_car_factor_l(5 * year_frac : end) country_lvol_factor_l(5 * year_frac : end) country_mom_factor_l(4 * year_frac + 1 : end) country_size_factor_l(end - 302 + 1:end) country_quality_factor_l(end - 302 + 1:end)];
->>>>>>> master
+
 factor_returns = factor_matrix(2 : end, :) ./ factor_matrix(1 : end - 1, :) - 1;
 factor_nav = cumprod(1 + sum(factor_returns, 2) / 6);
 factor_nav = [1; factor_nav];
@@ -498,16 +499,10 @@ for j = 1:length(Factor_rot_ret)
     logicalRotation(j,:) = (Factor_rot_ret(j,:) == maxL);
 end
 
-<<<<<<< HEAD
+
 Factor_rot_ret = sum(logicalRotation(1:end-1,:).*Factor_Returns(end-length(logicalRotation)+2:end,:),2);
 date = country_dates(end-length(Factor_rot_ret)+1:end);
 EWLong = EWLong(end-length(Factor_rot_ret)+1:end);
 figure(3)
 plot(date,cumprod(1+Factor_rot_ret),'-.b',date,cumprod(1+EWLong),'-.k','LineWidth', 1)
 legend('Factor Momentum Rotation', 'Equal', 'Location', 'northwest')
-=======
-figure(5)
-plot(country_dates, factor_matrix_ls(:, 7), '-.r', country_dates, factor_matrix(:, 7), '-.b', country_dates, equal_nav,'-.k', 'LineWidth',1)
-legend('Combo LS', 'Combo Long', 'Equal', 'Location','northwest')
-saveas(gcf, 'Combo.png');
->>>>>>> master
