@@ -6,8 +6,8 @@ bond_returns_euro = xlsread("bond_returns_euro.xls");
 real_bond_returns = xlsread("Real_bond_returns.xls");
 real_bond_returns = real_bond_returns(1:end-1,:);
 %short = 1, medium = 2, long = 3, ultra = 4
-term = 1;
-if term == 1;
+term = 3;
+if term == 3;
     futures_returns = xlsread("short_futures.xls");
 elseif term == 2;
     futures_returns = xlsread("medium_futures.xls");
@@ -45,7 +45,7 @@ elseif in_euro ==1;
     futures_returns(isnan(futures_returns)) = 0;
     country_returns = bond_xs_returns_euro .* futures_notavailable + futures_returns;
 end
-%country_returns = bond_xs_returns_euro;
+country_returns = bond_xs_returns_euro;
 %country_returns = real_bond_xs_returns;
 %% Loading Factor Size and Quality data
 
