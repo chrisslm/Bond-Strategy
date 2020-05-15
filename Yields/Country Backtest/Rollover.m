@@ -1,5 +1,6 @@
 clear
 clc
+
 %% Load data
 % load front- and backprices and ticker names separately
 austral_data    = readtable('Australian Futs.xlsx');

@@ -19,6 +19,7 @@ Real_yields = xlsread('real_yields_10y.xlsx');
 
 % Loading FX Rates
 FXrates = readtable('Exchange_rates_to_Euro.xlsx');
+FXDates = table2array(FXrates(:, 1));
 FXrates = table2array(FXrates(:, 2 : end));
 
 %Yields per Maturity
