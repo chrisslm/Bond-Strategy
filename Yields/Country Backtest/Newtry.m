@@ -13,6 +13,7 @@ dates               = datetime(table2array(futures_prices(6 : end, 1)));
 rf_dates            = datetime(table2array(risk_free(3 : end, 1)));
 monthly_dates       = datetime(table2array(yields(6 : end, 1)));
 fx_dates            = datetime(table2array(fx_rates(3 : end, 1)));
+forward_dates       = datetime(table2array(forward_points(3 : end, 1)));
 fx_names            = fx_rates.Properties.VariableNames(2 : 9);
 country_list        = ["Germany", "France", "Spain", "Italy", "UK", "Switzerland", "China", "Korea", "Australia", "Japan", "US", "Canada"];
 
@@ -121,19 +122,19 @@ monthly_tr_eur      = monthly_tr_eur(find(loc), :);
 monthly_xs_eur      = monthly_xs_eur(find(loc), :);
 dummy1              = nan(length(monthly_vol(:, 1)), 1);
 dummy2              = ones(length(monthly_vol(:, 1)), 1);
-monthly_vol         = [monthly_vol(:, 1 : 4), dummy2, dummy2, monthly_vol(:, 5 : 6), dummy2, dummy2, ...
+monthly_vol         = [monthly_vol(:, 1 : 3), dummy2, monthly_vol(:, 4), dummy2, monthly_vol(:, 5 : 6), dummy2, dummy2, ...
     monthly_vol(:, 7 : 10), dummy2, dummy2, monthly_vol(:, 11 : 13), dummy2, dummy2, monthly_vol(:, 14 : 16), ...
     dummy2, monthly_vol(:, 17), dummy2, monthly_vol(:, 18 : 19), dummy2, dummy2, dummy2, dummy2, monthly_vol(:, 20), dummy2, dummy2, monthly_vol(:, 21 : 23), ...
     dummy2, dummy2, monthly_vol(:, 24), dummy2, monthly_vol(:, 25 : 26), dummy2, dummy2, monthly_vol(:, 27 : 29), ...
     dummy2, monthly_vol(:, 30 : 37), dummy2, monthly_vol(:, 38)];
 monthly_vol         = [monthly_vol(:, 1 : 12), monthly_vol(:, 14 : end)];
-monthly_tr_eur         = [monthly_tr_eur(:, 1 : 4), dummy1, dummy1, monthly_tr_eur(:, 5 : 6), dummy1, dummy1, ...
+monthly_tr_eur         = [monthly_tr_eur(:, 1 : 3), dummy1, monthly_tr_eur(:, 4), dummy1, monthly_tr_eur(:, 5 : 6), dummy1, dummy1, ...
     monthly_tr_eur(:, 7 : 10), dummy1, dummy1, monthly_tr_eur(:, 11 : 13), dummy1, dummy1, monthly_tr_eur(:, 14 : 16), ...
     dummy1, monthly_tr_eur(:, 17), dummy1, monthly_tr_eur(:, 18 : 19), dummy1, dummy1, dummy1, dummy1, monthly_tr_eur(:, 20), dummy1, dummy1, monthly_tr_eur(:, 21 : 23), ...
     dummy1, dummy1, monthly_tr_eur(:, 24), dummy1, monthly_tr_eur(:, 25 : 26), dummy1, dummy1, monthly_tr_eur(:, 27 : 29), ...
     dummy1, monthly_tr_eur(:, 30 : 37), dummy1, monthly_tr_eur(:, 38)];
 monthly_tr_eur         = [monthly_tr_eur(:, 1 : 12), monthly_tr_eur(:, 14 : end)];
-monthly_xs_eur         = [monthly_xs_eur(:, 1 : 4), dummy1, dummy1, monthly_xs_eur(:, 5 : 6), dummy1, dummy1, ...
+monthly_xs_eur         = [monthly_xs_eur(:, 1 : 3), dummy1, monthly_xs_eur(:, 4), dummy1, monthly_xs_eur(:, 5 : 6), dummy1, dummy1, ...
     monthly_xs_eur(:, 7 : 10), dummy1, dummy1, monthly_xs_eur(:, 11 : 13), dummy1, dummy1, monthly_xs_eur(:, 14 : 16), ...
     dummy1, monthly_xs_eur(:, 17), dummy1, monthly_xs_eur(:, 18 : 19), dummy1, dummy1, dummy1, dummy1, monthly_xs_eur(:, 20), dummy1, dummy1, monthly_xs_eur(:, 21 : 23), ...
     dummy1, dummy1, monthly_xs_eur(:, 24), dummy1, monthly_xs_eur(:, 25 : 26), dummy1, dummy1, monthly_xs_eur(:, 27 : 29), ...
@@ -154,12 +155,70 @@ for j = 1 : length(fut_count)
     end
 end
 
-monthly_bond_ret(isnan(monthly_bond_ret)) = 0;
-monthly_tr_eur(isnan(monthly_tr_eur)) = 0;
-final_eur_tr_rets   = vol_indicator .* monthly_tr_eur - (1 - vol_indicator) .* monthly_bond_ret;
-final_eur_xs_rets   = final_eur_tr_rets - cumRf;
+final_eur_tr_rets1 = nan(length(monthly_vol(:, 1)), length(monthly_vol(1, :)));
+
+for l = 1 : length(monthly_bond_ret(1, :))
+    for p = 1 : length(monthly_bond_ret(:, 1))
+        if (vol_indicator(p, l) == 1) && (monthly_tr_eur(p, l) > -1)
+            final_eur_tr_rets1(p, l) = monthly_tr_eur(p, l);
+        elseif (vol_indicator(p, l) == 0) && (monthly_bond_ret(p, l) > -1)
+            final_eur_tr_rets1(p, l) = monthly_bond_ret(p, l);
+        end
+    end
+end
+
+%monthly_bond_ret(isnan(monthly_bond_ret)) = 0;
+%monthly_tr_eur(isnan(monthly_tr_eur)) = 0;
+%final_eur_tr_rets2   = vol_indicator .* monthly_tr_eur - (vol_indicator - 1) .* monthly_bond_ret;
+%final_eur_xs_rets2   = final_eur_tr_rets2 - cumRf;
+final_eur_xs_rets1   = final_eur_tr_rets1 - cumRf;
 
 % group futures into 2, 5, 10, 30 year futures
 yields_mat          = [yields(:, 1 : length(maturities)), getbondduration(yields(:, 1 : length(maturities)), maturities)];
-final_mat           = [yyyymmdd(monthly_dates), final_eur_tr_rets(:, linspace(1, 56, 12)), final_eur_tr_rets(:, linspace(2, 57, 12)), final_eur_tr_rets(:, linspace(3, 58, 12)),...
-    final_eur_tr_rets(:, linspace(4, 59, 12)), final_eur_tr_rets(:, linspace(5, 60, 12)), yields_mat, cumRf];
+final_mat           = [yyyymmdd(monthly_dates), final_eur_tr_rets1(:, linspace(1, 56, 12)), final_eur_tr_rets1(:, linspace(2, 57, 12)), final_eur_tr_rets1(:, linspace(3, 58, 12)),...
+    final_eur_tr_rets1(:, linspace(4, 59, 12)), final_eur_tr_rets1(:, linspace(5, 60, 12)), yields_mat, cumRf];
+
+%% Calculate Hedge returns
+
+forward_rates       = fx_rates(:, 1 : end - 1) + forward_points(:, 1 : 7) / 10000;
+[first, last]       = getFirstAndLastDayInPeriod(yyyymmdd(fx_dates), 2);
+last_fx             = fx_dates(last);
+korea_ret           = fx_rates(2 : end, end) ./ fx_rates(1 : end - 1, end) - 1;
+korea_ret           = [0; korea_ret];
+korea_ret(isnan(korea_ret)) = 0;
+cum_korea           = cumprod(1 + korea_ret);
+korea_use           = cum_korea(last);
+korea_month         = -1 * (korea_use(2 : end) ./ korea_use(1 : end - 1) - 1);
+forward_avail       = forward_points(first, :);
+korea_avail         = fx_rates(first, end);
+forward_rates       = forward_rates(last, :);
+fx_rates            = fx_rates(last, :);
+forward_xs          = (forward_rates(1 : end - 1, :) - fx_rates(2 : end, 1 : end - 1)) ./ fx_rates(1 : end - 1, 1 : end - 1);
+forward_xs          = [forward_xs, korea_month];
+forward_xs          = [zeros(1, length(forward_xs(1, :))); forward_xs];
+forward_xs(isnan(forward_xs)) = 0;
+
+forward_avail       = (forward_avail > -1000000);
+korea_avail         = (korea_avail > -1000000);
+forward_avail(:, 8) =  korea_avail;
+%last_forward        = cum_forward(last, :);
+%monthly_forward_xs  = last_forward(2 : end, :) ./ last_forward(1 : end - 1, :) - 1;
+%monthly_forward_xs  = [zeros(1, length(monthly_forward_xs(1, :))); monthly_forward_xs];
+monthly_forward_xs  = forward_xs;
+final_forward       = nan(length(monthly_forward_xs(:, 1)), length(monthly_forward_xs(1, :)));
+
+
+for l = 1 : length(monthly_forward_xs(1, :))
+    for p = 1 : length(monthly_forward_xs(:, 1))
+        if (forward_avail(p, l) == 1) && (monthly_forward_xs(p, l) > -1)
+            final_forward(p, l) = monthly_forward_xs(p, l);
+        end
+    end
+end
+
+final_forward = final_forward(2 : end - 1, :);
+last_fx       = last_fx(2 : end - 1);
+final_forward = [yyyymmdd(last_fx), final_forward];
+
+
+
